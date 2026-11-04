@@ -1,0 +1,118 @@
+name: COPS original action narrator 41 scenes
+on:
+  push:
+    branches:
+      - rea-voice-audition-20261103
+    paths:
+      - '.github/workflows/rea-cops-original-action-voice-20261103.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  render-original-action-voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing original-voice runtime
+        run: python -m pip install --disable-pip-version-check -q kokoro-onnx soundfile numpy
+      - name: Download publicly licensed voice model
+        run: |
+          curl -fL --retry 2 --max-time 240 -o kokoro-v1.0.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx
+          curl -fL --retry 2 --max-time 120 -o voices-v1.0.bin https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
+          test "$(stat -c%s kokoro-v1.0.onnx)" -gt 50000000
+      - name: Render forty-one original scripted voice cues
+        run: |
+          cat > cues.txt <<'CUES'
+          20265_01|A quiet evening in Kennedale, Texas. But that traffic is about to turn ugly.
+          20265_02|One sudden move sends cars scattering. And in a split second, the road erupts into chaos.
+          20265_03|With wrecked vehicles and smoke ahead, emergency crews race to get control of the scene.
+          20265_04|As stunned bystanders look on, the only thing that matters now is keeping people safe.
+          20266_01|In this quiet desert town, a rusty pickup has a sheriff's unit on its tail.
+          20266_02|The driver leaves the pavement, throwing up a wall of dust. But the deputies aren't far behind.
+          20266_03|Back in town, the chase tears past storefronts as more patrol cars close in.
+          20266_04|The escape route ends here. Deputies move in, carefully taking control of the scene.
+          20266_05|Out here, an empty road can still lead to a dangerous finish.
+          20267_01|Midnight in Los Angeles. A battered sedan is headed straight into a nightmare of flashing lights.
+          20267_02|The driver keeps rolling through neon-lit streets, with police cruisers filling the blocks behind him.
+          20267_03|There's no clear way out. The car creeps onward as officers tighten the net.
+          20267_04|Moments later, police move in. And the suspect's options disappear, one by one.
+          20267_05|This wild ride is over. Tonight, the flashing lights have the final say.
+          20268_01|In the San Fernando Valley, traffic is thick. But one battered S.U.V. refuses to slow down.
+          20268_02|Pedestrians scramble to safety as the vehicle pushes deeper into the crowded streets.
+          20268_03|One tight turn becomes a costly mistake. The S.U.V. crashes near a roadside barrier.
+          20268_04|Police surround the damaged vehicle as smoke rises, blocking any easy way out.
+          20268_05|Now the street is locked down, the vehicle is finished, and help is on the scene.
+          20269_01|Rain pounds the freeway near Torrance. Visibility is falling, and the danger is climbing.
+          20269_02|A red car darts through a sea of brake lights while patrol units move into position.
+          20269_03|The driver tries to break away across slick lanes. But the traffic keeps closing in.
+          20269_04|With police on every side, there's suddenly nowhere left to go.
+          20269_05|Officers take two people into custody. The chase is over, but the risks were real in this animated scene.
+          20270_01|Tonight, a reckless driver turns a city freeway into a dangerous game of cat and mouse.
+          20270_02|Patrol cars flood the road. The fleeing car pushes forward, squeezing through the traffic ahead.
+          20270_03|The pressure builds with every mile. One wrong move could put an innocent motorist in the middle.
+          20270_04|The driver tries to shake the cruisers, but the pursuit keeps tightening. Sparks fly as the battered car struggles onward.
+          20270_05|Out on the edge of town, the chase takes a dangerous turn. Thick smoke pours from the vehicle.
+          20270_06|Now it looks like the road is finally running out for this driver.
+          20270_07|Officers converge and order everyone to stay put. The scene is finally coming under control.
+          20270_08|After this long, risky pursuit, the final stop isn't another freeway exit. It's police custody.
+          20272_01|Cincinnati, Ohio. From high above the city, police keep watch on a car below.
+          20272_02|The search moves off the main roads and toward the darker streets beneath the skyline.
+          20272_03|A narrow intersection turns into a chaotic tangle of twisted metal and flashing lights.
+          20272_04|With the car stopped, the suspect's escape route is disappearing fast.
+          20272_05|Officers step in and take control of the scene. Another dangerous pursuit comes to an end.
+          20274_01|Looks like a routine delivery. Until this little truck catches the eye of the law.
+          20274_02|The action leads straight into the park, where even the trees aren't offering much cover.
+          20274_03|Officers surround the scene as the suspect tries one last disappearing act.
+          20274_04|But this time, the only thing getting served... is justice.
+          CUES
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          import soundfile as sf
+          from kokoro_onnx import Kokoro
+          model=Kokoro("kokoro-v1.0.onnx","voices-v1.0.bin")
+          Path("out").mkdir(exist_ok=True)
+          report={"source":"original fictional animated COPS scene scripts","model":"Kokoro v1.0; kokoro-onnx","voice":"am_fenrir","clone_of_named_person":False,"cues":[]}
+          for line in Path("cues.txt").read_text().splitlines():
+            if not line.strip():continue
+            cue_id,script=line.split("|",1)
+            audio,sr=model.create(script,voice="am_fenrir",speed=1.105,lang="en-us")
+            dest=Path("out")/(cue_id+"_am_fenrir_original.wav")
+            sf.write(dest,audio,sr,subtype="PCM_16")
+            report["cues"].append({"id":cue_id,"text":script,"duration_seconds":round(len(audio)/sr,3),"sample_rate":int(sr),"sha256":hashlib.sha256(dest.read_bytes()).hexdigest()})
+            print(f"RENDERED {cue_id} {len(audio)/sr:.3f}s",flush=True)
+          assert len(report["cues"])==41,(len(report["cues"]),"expected 41")
+          for voice in ("am_onyx","am_michael"):
+            audio,sr=model.create(report["cues"][0]["text"],voice=voice,speed=1.10,lang="en-us")
+            sf.write(Path("out")/("20265_01_"+voice+"_audition.wav"),audio,sr,subtype="PCM_16")
+          Path("out/RENDER_REPORT.json").write_text(json.dumps(report,indent=2))
+          print("COMPLETED 41 plus two voice alternates")
+          PY
+      - name: Upload resulting WAV tracks and report
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cops-41-original-action-narrations-20261103
+          path: out/
+          retention-days: 7
+      - name: Save render receipt on existing private work branch
+        if: success()
+        env:
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          GH_ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          python - <<'PY'
+          import os,json
+          from pathlib import Path
+          Path("cops_voice_41_render_receipt.json").write_text(json.dumps({"run_id":int(os.environ["GH_RUN_ID"]),"artifact_id":int(os.environ["GH_ARTIFACT_ID"]),"artifact_url":os.environ["GH_ARTIFACT_URL"],"status":"41 files successfully generated","voice":"am_fenrir","voice_is_imitation":False},indent=2))
+          PY
+          git config user.name "ChatGPT Production QA"
+          git config user.email "actions@users.noreply.github.com"
+          git add cops_voice_41_render_receipt.json
+          git commit -m "QA receipt for 41 original action narration cues"
+          git push origin HEAD:rea-voice-audition-20261103
